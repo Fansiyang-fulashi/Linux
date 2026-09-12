@@ -1,49 +1,76 @@
-#include<stdio.h>
-//上一个路径
+#include <iostream>
+#include <cstdio>
+#include <cstring>
+#include <cstdlib>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <cstring>
+#include <unordered_map>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+
+#define COMMAND_SIZE 1024
+
+#define CWD_BUF_SIZE 1024
+char cwd_buf[CWD_BUF_SIZE];
+
+#define CWDENV_SIZE 1024
+char cwdenv[CWDENV_SIZE];
+
+#define HOST_NAME_SIZE 256
+
+const char* FORMAT="%s@%s:%s$ ";
+
+#define COMMANDLINE_SIZE 1024
+
+#define MAX_ARGV_SIZE 128
+char* argv[MAX_ARGV_SIZE];
+int argc=0;
+
+int lastcode=0;
+
 char* PREVPATH=getenv("PWD");
+#define PREVPATH_BUF_SIZE 256
+char prevpath_buf[PREVPATH_BUF_SIZE];
 
-//路径缓冲区
-#define CWD_BUF_MAX 1024
-char buf[CWD_BUF_MAX];
-char prev_buf[CWD_BUF_MAX];
-
-//环境变量缓冲
-#define BUF_MAX 1024
-char pwd_buf[BUF_MAX];
-
-//最近一次进程退出码
-int lastexit=0;
-
-//环境变量表
-#define ENV_MAX 100
-char* envs[ENV_MAX];
+#define ENVS_SIZE 1024
+char* envs[ENVS_SIZE];
 int envc=0;
 
-//别名表
-#define ALIAS_SIZE_MAX 100
+#define ENV_BUF_SIZE 256
+
 std::unordered_map<std::string,std::string> alias_table;
+
+#define NO_REDIR 0
+#define INPUT_REDIR 1
+#define OUTPUT_REDIR 2
+#define APPEND_REDIR 3
+int redir=0;
+#define FILE_NAME_SIZE 256
+std::string file_name;
 
 const char* GetUserName()
 {
-    const char* username=getenv("USER");
-    return username==NULL?"None":username;
+    const char* name=getenv("USER");
+    return name==NULL?"None":name;
 }
 
-const char* GetHost()
+const char* GetHostName()
 {
-    static char hostname[HOST_NAME_MAX];
+    static char hostname[HOST_NAME_SIZE];
     gethostname(hostname,sizeof(hostname));
     return hostname==NULL?"None":hostname;
 }
 
 const char* GetPwd()
 {
-    //const char* pwd=getenv("PWD");
-    const char* pwd=getcwd(buf,sizeof(buf));
+    const char* pwd=getcwd(cwd_buf,sizeof(cwd_buf));
     if(pwd!=NULL)
     {
-        snprintf(pwd_buf,sizeof(pwd_buf),"PWD=%s",pwd);
-        putenv(pwd_buf);
+        snprintf(cwdenv,sizeof(cwdenv),"PWD=%s",cwd_buf);
+        putenv(cwdenv);
     }
     return pwd==NULL?"None":pwd;
 }
@@ -51,159 +78,130 @@ const char* GetPwd()
 const char* GetHome()
 {
     const char* home=getenv("HOME");
-    return home==NULL?"":home;
+    return home==NULL?"None":home;
 }
 
-void InitEnv()
+void MakeCommandPrompt(char prompt[],int size)
 {
-    extern char** environ;
-    memset(envs,0,sizeof(envs));
-    for(int i=0;environ[i];i++)
-    {
-        envs[i]=(char*)malloc(strlen(environ[i]));
-        strcpy(envs[i],environ[i]);
-        envc++;
-    }
-    envs[envc]=NULL;
-    for(int i=0;envs[i];i++)
-    {
-        putenv(envs[i]);
-    }
-    environ=envs;
-}
-
-void MakeCommandPrompt(char cmd_prompt[],int size)
-{
-    snprintf(cmd_prompt,size,FORMAT,GetUserName(),GetHost(),GetPwd());
+    snprintf(prompt,size,FORMAT,GetUserName(),GetHostName(),GetPwd());
 }
 
 void PrintCommandPrompt()
 {
-    char prompt[COMMAND_PROMAT_SIZE_MAX];
+    char prompt[COMMAND_SIZE];
     MakeCommandPrompt(prompt,sizeof(prompt));
     printf("%s",prompt);
-    fflush(stdout);//刷新
+    fflush(stdout);
 }
 
-bool GetUserCommand(char* user_cmd,int size)
+bool GetCommandline(char* out,int size)
 {
-    char* c=fgets(user_cmd,size,stdin);
-    if(c==nullptr)
-        return false;
-    user_cmd[strlen(user_cmd)-1]=0;
+    char* comline=fgets(out,size,stdin);
+    if(comline==NULL) return false;
+    out[strlen(out)-1]=0;//
+    if(strlen(out)==0) return false;
     return true;
 }
 
-bool CommandParse(char* commandline)
+bool CommandlineParse(char* out)
 {
-    #define SEP " "//还能这样定义？
+#define SEP " "
     argc=0;
-    argv[argc++]=strtok(commandline,SEP);
-    while(argv[argc++]=strtok(nullptr,SEP));//若为nullptr 其会在上一次切的地方继续切割 且argv最后一个被设置为nullptr
+    argv[argc++]=strtok(out,SEP);
+    while((bool)(argv[argc++]=strtok(NULL,SEP)));
     argc--;
-    return argc>0;
+    return argc>0?true:false;
 }
 
 void PrintArgv()
 {
-    for(int i=0;argv[i];i++)
+    for(int i=0;i<argc;i++)
     {
         printf("%s\n",argv[i]);
     }
 }
 
-void Cd()
+int Execute()
 {
-    if(argc==1)
-  {
-      std::string home=GetHome();
-      if(home.empty())
-          return;
-      PREVPATH=getcwd(prev_buf,sizeof(prev_buf));
-      chdir(home.c_str());
-  }
-  else
-  {
-      std::string where=argv[1];
-      if(where=="-")
-      {
-          if(PREVPATH!=NULL)
-          chdir(PREVPATH);
-      }
-      else if(where=="~")
-      {
-          PREVPATH=getcwd(prev_buf,sizeof(prev_buf));
-          where=GetHome();
-          if(where.empty())
-              return;
-          chdir(where.c_str());
-      }
-      else
-      {
-          PREVPATH=getcwd(prev_buf,sizeof(prev_buf));
-          chdir(where.c_str());
-      }
-  }
+    pid_t id=fork();
+    if(id==0)
+    {
+        int fd=-1;
+        if(redir==INPUT_REDIR)
+        {
+            fd=open(file_name.c_str(),O_RDONLY);
+            if(fd<0) exit(1);
+            dup2(fd,0);
+            close(fd);
+        }
+        else if(redir==OUTPUT_REDIR)
+        {
+            fd=open(file_name.c_str(),O_CREAT|O_WRONLY|O_TRUNC,0666);
+            if(fd<0) exit(1);
+            dup2(fd,1);
+            close(fd);
+        }
+        else if(redir==APPEND_REDIR)
+        {
+            fd=open(file_name.c_str(),O_CREAT|O_WRONLY|O_APPEND,0666);
+            if(fd<0) exit(1);
+            dup2(fd,1);
+            close(fd);
+        }
+        execvp(argv[0],argv);
+        exit(1);
+    }
+    int status=0;
+    pid_t rid=waitpid(id,&status,0);
+    if(rid>0)
+    {
+        lastcode=WEXITSTATUS(status);
+    }
+    return 0;
 }
 
-void Export()
+bool Cd()
 {
-#define ENVBUF_SIZE_MAX 1024
-    if(argc==2)
+    if(argc==1)
     {
-        char envbuf[ENVBUF_SIZE_MAX];
-        memset(envbuf,sizeof(envbuf),0);
-        auto has_env=[&]{
-            for(int i=0;envs[i];i++)
-            {   
-                envbuf=strtok(envs[i],"=");
-                if(strcmp(argv[1],envbuf)==0)
-                    return i;
-            }
-            return -1;
-        };
-        int exist=has_env();
-        if(exist==-1)
+        std::string home=GetHome();
+        if(home=="None") return true;
+        PREVPATH=getcwd(prevpath_buf,sizeof(prevpath_buf));
+        chdir(home.c_str());
+    }
+    else 
+    {
+        std::string where=argv[1];
+        if(where=="-")
         {
-            envs[envc]=(char*)malloc(sizeof(argv[1]));
-            strcpy(envs[envc],argv[1]);
-            envc++;
-            envs[envc]=0;
+            if(PREVPATH==NULL)
+                return true;
+            chdir(PREVPATH);
+        }
+        else if(where=="~")
+        {
+            std::string home=GetHome();
+            if(home=="None") return true;
+            PREVPATH=getcwd(prevpath_buf,sizeof(prevpath_buf));
+            chdir(home.c_str());
         }
         else
         {
-            strcpy(envs[exist],argv[1]);
+            PREVPATH=getcwd(prevpath_buf,sizeof(prevpath_buf));
+            chdir(where.c_str());
         }
     }
-}
-
-void Alias()
-{
-    if(argc==2)
-    {
-        char* key=strtok(argv[1],"=");
-        for(int i=0;;i++)
-        {
-            if(argv[1][i]=='=')
-            {
-                char* value=argv[1]+i+1;
-            }
-        }
-        alias_table[key]=value;
-        return true;
-    }
+    return true;
 }
 
 void Echo()
 {
-    if(argc==2)
-    {
+   if(argc==2)
+   {
         std::string opt=argv[1];
         if(opt=="$?")
         {
-            std::cout<<lastexit<<std::endl;
-            lastexit=0;
-            return;
+            std::cout<<lastcode<<std::endl;
         }
         else if(opt[0]=='$')
         {
@@ -212,10 +210,68 @@ void Echo()
             if(env)
                 std::cout<<env<<std::endl;
         }
-        else 
+        else
         {
             std::cout<<opt<<std::endl;
         }
+   }
+   return;
+}
+
+void Export()
+{
+    if(argc==2)
+    {
+        char* tmp_env;
+        auto has_env=[&]{
+            for(int i=0;envs[i];i++)
+            {
+               tmp_env=strchr(envs[i],'=');
+               if(tmp_env==NULL) continue;
+               if(strcmp(tmp_env,argv[1])==0)
+                   return i;
+            }
+            return -1;
+        };
+        int exist=has_env();
+        if(exist==-1)
+        {
+            envs[envc]=(char*)malloc(strlen(argv[1]));
+            strcpy(envs[envc],argv[1]);
+            envc++;
+            envs[envc]=NULL;
+        }
+        else
+        {
+            strcpy(envs[exist],argv[1]);
+        }
+    }
+    return;
+}
+
+void Alias()
+{
+    if(argc==1)
+    {
+        for(auto& x:alias_table)
+        {
+            std::cout<<x.first<<'='<<x.second<<std::endl;
+        }
+    }
+    else if(argc>=2)
+    {
+        std::string s=argv[1];
+        for(int i=2;i<argc;i++)
+        {
+            s+=" ";
+            s+=argv[i];
+        }
+        size_t pos=s.find('=');
+        if(pos==s.npos)
+            return;
+        std::string key=s.substr(0,pos);
+        std::string value=s.substr(pos+1);
+        alias_table[key]=value;
     }
     return;
 }
@@ -230,8 +286,11 @@ bool CheckAndExecBuiltin()
     }
     else if(cmd=="echo")
     {
-        Echo();
-        return true;
+        //if(redir==NO_REDIR)
+        //{
+            Echo();
+            return true;
+        //}
     }
     else if(cmd=="export")
     {
@@ -246,80 +305,101 @@ bool CheckAndExecBuiltin()
     return false;
 }
 
-int Execute()
+void InitEnv()
 {
-    pid_t id = fork();
-    if(id == 0)
+    extern char** environ;
+    memset(envs,0,sizeof(envs));
+    for(int i=0;environ[i];i++)
     {
-        //child
-        execvp(argv[0], argv);
-        exit(1);
+        envs[i]=(char*)malloc(strlen(environ[i])+ENV_BUF_SIZE);
+        strcpy(envs[i],environ[i]);
+        envc++;
     }
-    int status = 0;
-    // father
-    pid_t rid = waitpid(id, &status, 0);
-    if(rid > 0)
-    {
-        lastexit = WEXITSTATUS(status);
-    }
-    return 0;
-}
-
-void CleanUp()
-{
+    envs[envc]=NULL;
     for(int i=0;envs[i];i++)
     {
-        free(envs[i]);
+        putenv(envs[i]);
     }
+    environ=envs;
 }
 
-bool CheckAlias()
+bool CheckAlias(char* out)
 {
-    if(alias_table.count==1)
+    std::string key=out;
+    if(alias_table.count(key)==0)
     {
-        char commandline[COMMAND_SIZE_MAX];
-        if(!GetUserCommand(commandline, sizeof(commandline)))
-            return true;
-        if(!CommandParse(commandline))
-            return true;
-        if(CheckAndExecBuiltin())
-            return true;
-        Execute();
-        return true;
+        return false;
     }
-    return false;
+    std::string cmd=alias_table[key];
+    if(!CommandlineParse((char*)cmd.c_str()))
+        return true;
+    if(CheckAndExecBuiltin())
+        return true;
+    Execute();
+    return true;
+}
+
+void CheckRedir(char* out)
+{
+    redir=NO_REDIR;
+    std::string s=out;
+    if(s.find(">>")!=s.npos)
+    {
+        redir=OUTPUT_REDIR;
+        size_t pos=s.find(">>");
+        out[pos]=0;
+        size_t fpos=pos+2;
+        for(;fpos<s.size();fpos++)
+        {
+            if(s[fpos]!=' ')
+                break;
+        }
+        file_name=s.substr(fpos);
+    }
+    else if(s.find('>')!=s.npos)
+    {
+        redir=APPEND_REDIR;
+        size_t pos=s.find(">");
+        out[pos]=0;
+        size_t fpos=pos+1;
+        for(;fpos<s.size();fpos++)
+        {
+            if(s[fpos]!=' ')
+                break;
+        }
+        file_name=s.substr(fpos);
+    }
+    else if(s.find('<')!=s.npos)
+    {
+        redir=INPUT_REDIR;
+        size_t pos=s.find("<");
+        out[pos]=0;
+        size_t fpos=pos+1;
+        for(;fpos<s.size();fpos++)
+        {
+            if(s[fpos]!=' ')
+                break;
+        }
+        file_name=s.substr(fpos);
+    }
 }
 
 int main()
 {
-    //初始化构建环境变量表
     InitEnv();
-
     while(true)
     {
-        // 1. 输出命令行提示符
-        PrintCommandPrompt();
-
-        // 2. 获取用户输入的命令
-        char commandline[COMMAND_SIZE_MAX];
-        if(!GetUserCommand(commandline, sizeof(commandline)))
-            continue;
-
-        // 3. 命令行分析 "ls -a -l" -> "ls" "-a" "-l"
-        if(!CommandParse(commandline))
-            continue;
-        //PrintArgv();
-
-        // 检测别名
-        CheckAlias();
-        // 4. 检测并处理内键命令
+        PrintCommandPrompt();    
+        char commandline[COMMANDLINE_SIZE];
+        if(!GetCommandline(commandline,sizeof(commandline)))
+                continue;
+        CheckRedir(commandline);
+        if(!CommandlineParse(commandline))
+                continue;
         if(CheckAndExecBuiltin())
-            continue;
-
-        // 5. 执行命令
+                continue;
+        if(CheckAlias(commandline))
+                continue;
         Execute();
     }
-    CleanUp();
-    return 0;
 }
-

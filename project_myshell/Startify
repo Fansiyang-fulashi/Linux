@@ -1,0 +1,33 @@
+
+            __                __                
+    __   __/_/___ ___  ____  / /_  _______      
+    \ \ / / / __ `__ \/ __ \/ / / / / ___/      
+     \ V / / / / / / / /_/ / / /_/ (__  )       
+      \_/_/_/ /_/ /_/ ,___/_/\____/____/        
+                   /_/                          
+                                                
+    Keep It Simple, Stupid.                     
+
+   [e]  <empty buffer>
+
+   MRU
+
+   [0]   ~/Linux_Study/Linux/project_myshell/true_myshell.cpp
+   [1]   ~/Linux_Study/Linux/project_myshell/myshell2.cpp
+   [2]   ~/Linux_Study/Linux/project_myshell/myshell.cpp
+   [3]   ~/Linux_Study/Linux/26_8_31/myfile.c
+   [4]   ~/Linux_Study/Linux/26_8_31/Makefile
+   [5]   ~/Linux_Study/Linux/project_processbar/processbar.h
+   [6]   ~/Linux_Study/Linux/project_processbar/processbar.c
+   [7]   ~/Linux_Study/Linux/project_processbar/main.c
+   [8]   ~/Linux_Study/Linux/26_8_21/1.c
+   [9]   ~/Linux_Study/Linux/26_8_21/Makefile
+
+   MRU /home/ubuntu/Linux_Study/Linux/project_myshell
+
+   [10]  true_myshell.cpp
+   [11]  myshell2.cpp
+   [12]  myshell.cpp
+   [13]  Makefile
+
+   [q]  <quit>

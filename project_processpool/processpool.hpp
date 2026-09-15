@@ -148,6 +148,7 @@ public:
     void Run()
     {
         size_t code=_tm.ReturnTaskCode();
+        //std::cout<<code<<std::endl;
         channel& ch=_cm.ChooseProcess();
         ch.Send(code);
     }

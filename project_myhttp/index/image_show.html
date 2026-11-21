@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图文展示页面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: "Microsoft Yahei", sans-serif;
+            background-color: #f4f4f4;
+            padding: 30px;
+        }
+        .card {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        }
+        .card img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .text-wrap {
+            padding: 24px;
+        }
+        .title {
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            color: #222;
+        }
+        .desc {
+            font-size: 16px;
+            color: #555;
+            line-height: 1.7;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <!-- 这里 src 换成你的图片，本地文件直接写相对路径，网络图写url -->
+        <img src="Kagami.Sumika.full.1623386.jpg" alt="照片">
+        <div class="text-wrap">
+            <div class="title">纯夏</div>
+            <div class="desc">
+                鉴纯夏 love love
+            </div>
+        </div>
+    </div>
+</body>
+</html>

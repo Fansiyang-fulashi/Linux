@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>GET方式登录演示（仅学习）</title>
+    <style>
+        .login-box {
+            width: 300px;
+            margin: 100px auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+        .item {
+            margin-bottom:15px;
+        }
+        label {
+            display:block;
+            margin-bottom:5px;
+        }
+        input {
+            width:100%;
+            box-sizing: border-box;
+            padding:6px;
+        }
+        button {
+            width:100%;
+            padding:8px;
+            cursor:pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <h3>登录（GET 请求）</h3>
+        <!-- form 默认 method="get"，提交后参数拼在url：?username=xxx&password=xxx -->
+        <form action="/login" method="GET">
+            <div class="item">
+                <label>用户名</label>
+                <input type="text" name="username" required>
+            </div>
+            <div class="item">
+                <label>密码</label>
+                <input type="password" name="password" required>
+            </div>
+            <button type="submit">登录</button>
+        </form>
+    </div>
+</body>
+</html>

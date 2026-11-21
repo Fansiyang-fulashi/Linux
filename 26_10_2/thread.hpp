@@ -1,6 +1,10 @@
 #pragma once
 
-#include"comm.hpp"
+#include<iostream>
+#include<pthread.h>
+#include<string>
+#include<functional>
+#include<unistd.h>
 
 template<class T>
 class thread
